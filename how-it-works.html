@@ -278,16 +278,24 @@
     <script>
         // Initialize the chatbot when the page is fully loaded
         document.addEventListener('DOMContentLoaded', function() {
-            // Create a new chatbot instance
-            const chatbot = new SkillpathChatbot({
-                position: 'bottom-right',
-                title: 'Skillpath Assistant',
-                welcomeMessage: 'Hello! 👋 I\'m your AI coaching assistant. How can I help with your professional development today?',
-                // Replace with your actual n8n webhook URL
-                webhookUrl: 'https://your-n8n-instance.com/webhook/skillpath-chatbot',
-                primaryColor: '#00b3b0',
-                secondaryColor: '#1a3c6e'
-            });
+            console.log('DOM fully loaded, initializing chatbot');
+
+            try {
+                // Create a new chatbot instance
+                const chatbot = new SkillpathChatbot({
+                    position: 'bottom-right',
+                    title: 'Skillpath Assistant',
+                    welcomeMessage: 'Hello! 👋 I\'m your AI coaching assistant. How can I help with your professional development today?',
+                    // Replace with your actual n8n webhook URL
+                    webhookUrl: 'https://your-n8n-instance.com/webhook/skillpath-chatbot',
+                    primaryColor: '#00b3b0',
+                    secondaryColor: '#1a3c6e'
+                });
+
+                console.log('Chatbot initialized successfully');
+            } catch (error) {
+                console.error('Error initializing chatbot:', error);
+            }
         });
     </script>
 </body>

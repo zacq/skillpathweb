@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #1a3c6e;
+        }
+        
+        p {
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .test-controls {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background-color: #009a98;
+        }
+        
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+        }
+        
+        .log-entry.error {
+            color: #ff6b5b;
+        }
+        
+        .log-entry.success {
+            color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Skillpath.ai Chatbot Test</h1>
+        <p>This page tests the functionality of the collapsible chatbot component.</p>
+        
+        <div class="test-controls">
+            <h2>Test Controls</h2>
+            <button id="init-chatbot">Initialize Chatbot</button>
+            <button id="toggle-chatbot">Toggle Chatbot</button>
+            <button id="send-message">Send Test Message</button>
+            
+            <div class="log-container" id="log-container">
+                <div class="log-entry">Chatbot test page loaded.</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="chatbot.js"></script>
+    <script>
+        // Custom console logger
+        const logContainer = document.getElementById('log-container');
+        
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Also log to console
+            console.log(message);
+        }
+        
+        // Override console methods
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        console.log = function() {
+            const args = Array.from(arguments).join(' ');
+            log(args);
+            originalConsoleLog.apply(console, arguments);
+        };
+        
+        console.error = function() {
+            const args = Array.from(arguments).join(' ');
+            log(args, 'error');
+            originalConsoleError.apply(console, arguments);
+        };
+        
+        // Global chatbot variable
+        let chatbot = null;
+        
+        // Initialize button
+        document.getElementById('init-chatbot').addEventListener('click', function() {
+            try {
+                log('Initializing chatbot...');
+                
+                chatbot = new SkillpathChatbot({
+                    position: 'bottom-right',
+                    title: 'Skillpath Assistant',
+                    welcomeMessage: 'Hello! 👋 I\'m your AI coaching assistant. How can I help with your professional development today?',
+                    webhookUrl: 'https://your-n8n-instance.com/webhook/skillpath-chatbot',
+                    primaryColor: '#00b3b0',
+                    secondaryColor: '#1a3c6e'
+                });
+                
+                log('Chatbot initialized successfully', 'success');
+            } catch (error) {
+                log(`Error initializing chatbot: ${error.message}`, 'error');
+            }
+        });
+        
+        // Toggle button
+        document.getElementById('toggle-chatbot').addEventListener('click', function() {
+            if (!chatbot) {
+                log('Chatbot not initialized yet', 'error');
+                return;
+            }
+            
+            try {
+                log('Toggling chatbot window');
+                chatbot.toggleChatWindow();
+            } catch (error) {
+                log(`Error toggling chatbot: ${error.message}`, 'error');
+            }
+        });
+        
+        // Send message button
+        document.getElementById('send-message').addEventListener('click', function() {
+            if (!chatbot) {
+                log('Chatbot not initialized yet', 'error');
+                return;
+            }
+            
+            try {
+                log('Sending test message');
+                
+                // Directly access the chatbot's methods
+                chatbot.addMessage('This is a test message from the test page', 'sent');
+                
+                // Simulate a response
+                setTimeout(() => {
+                    chatbot.removeTypingIndicator();
+                    chatbot.addMessage('I received your test message!', 'received');
+                }, 1000);
+                
+                log('Test message sent successfully', 'success');
+            } catch (error) {
+                log(`Error sending test message: ${error.message}`, 'error');
+            }
+        });
+        
+        // Log page load
+        log('Test page fully loaded', 'success');
+    </script>
+</body>
+</html>
