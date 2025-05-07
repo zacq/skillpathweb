@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #1a3c6e;
+        }
+
+        p {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: #009a98;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+        }
+
+        .log-entry.error {
+            color: #ff6b5b;
+        }
+
+        .log-entry.success {
+            color: #4caf50;
+        }
+
+        .response-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: none;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Skillpath.ai Webhook Test</h1>
+        <p>This page tests the webhook integration for the Skillpath.ai chatbot.</p>
+
+        <div class="test-section">
+            <h2>Direct Webhook Test</h2>
+            <p>Test sending a message directly to the webhook without using the chatbot component.</p>
+
+            <input type="text" id="test-message" placeholder="Enter a test message">
+            <button id="send-test">Send Test Message</button>
+
+            <div class="response-container" id="response-container">
+                <h3>Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+
+            <div class="log-container" id="log-container">
+                <div class="log-entry">Webhook test page loaded.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Custom console logger
+        const logContainer = document.getElementById('log-container');
+        const responseContainer = document.getElementById('response-container');
+        const responseData = document.getElementById('response-data');
+
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            // Also log to console
+            console.log(message);
+        }
+
+        // Send test message button
+        document.getElementById('send-test').addEventListener('click', function() {
+            const message = document.getElementById('test-message').value.trim();
+            if (!message) {
+                log('Please enter a message to send', 'error');
+                return;
+            }
+
+            log(`Sending test message: "${message}"`);
+
+            // Generate a session ID for testing
+            const sessionId = 'test_session_' + Date.now();
+
+            // Webhook URL
+            const webhookUrl = 'https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f';
+
+            // Use a CORS proxy to bypass CORS restrictions
+            const corsProxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = encodeURIComponent(webhookUrl);
+            const proxyUrl = corsProxyUrl + targetUrl;
+
+            log(`Using CORS proxy: ${proxyUrl}`);
+
+            // Send the request
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Required by some CORS proxies
+                },
+                mode: 'cors', // Add CORS mode
+                credentials: 'omit', // Don't send credentials through proxy
+                body: JSON.stringify({
+                    message: message,
+                    timestamp: new Date().toISOString(),
+                    sessionId: sessionId,
+                    source: window.location.href,
+                    userAgent: navigator.userAgent,
+                    isTest: true
+                })
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+
+                // Clone the response so we can both check the text and parse as JSON if possible
+                return response.text().then(text => {
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.status} ${response.statusText} - ${text}`);
+                    }
+
+                    // Try to parse as JSON, but fall back to text if it's not valid JSON
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        log('Response is not valid JSON, returning as text', 'error');
+                        return { response: text, isTextResponse: true };
+                    }
+                });
+            })
+            .then(data => {
+                log('Data parsed successfully', 'success');
+
+                // Display the response
+                responseContainer.style.display = 'block';
+
+                if (data.isTextResponse) {
+                    responseData.textContent = data.response;
+                    log(`Response (text): "${data.response.substring(0, 100)}${data.response.length > 100 ? '...' : ''}"`, 'success');
+                } else {
+                    responseData.textContent = JSON.stringify(data, null, 2);
+                    log(`Response message: "${data.response || 'No response message'}"`, 'success');
+                }
+            })
+            .catch(error => {
+                log(`Error: ${error.message}`, 'error');
+
+                // Show error in response container
+                responseContainer.style.display = 'block';
+                responseData.textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Log page load
+        log('Test page fully loaded', 'success');
+    </script>
+</body>
+</html>

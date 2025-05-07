@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Diagnostics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1, h2 {
+            color: #1a3c6e;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .test-controls {
+            margin-top: 15px;
+        }
+        
+        button {
+            padding: 8px 15px;
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background-color: #009a98;
+        }
+        
+        input[type="text"], textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+        
+        .log-container {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .log-entry.error {
+            color: #ff6b5b;
+        }
+        
+        .log-entry.success {
+            color: #4caf50;
+        }
+        
+        .log-entry.info {
+            color: #2196f3;
+        }
+        
+        .response-container {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .option-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .option-item label {
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Webhook Diagnostics Tool</h1>
+        <p>This tool helps diagnose issues with the webhook integration.</p>
+        
+        <div class="test-section">
+            <h2>Webhook URL</h2>
+            <input type="text" id="webhook-url" value="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f" placeholder="Enter webhook URL">
+            
+            <h2>Request Options</h2>
+            <div class="options-grid">
+                <div class="option-item">
+                    <input type="checkbox" id="option-cors" checked>
+                    <label for="option-cors">Include CORS headers</label>
+                </div>
+                <div class="option-item">
+                    <input type="checkbox" id="option-credentials" checked>
+                    <label for="option-credentials">Include credentials</label>
+                </div>
+                <div class="option-item">
+                    <input type="checkbox" id="option-json" checked>
+                    <label for="option-json">JSON content type</label>
+                </div>
+            </div>
+            
+            <h2>Request Payload</h2>
+            <textarea id="request-payload">{
+  "message": "Test message from diagnostics tool",
+  "timestamp": "2023-07-20T12:34:56.789Z",
+  "sessionId": "test_session_123",
+  "source": "webhook-diagnostics.html",
+  "userAgent": "Diagnostics Tool"
+}</textarea>
+            
+            <div class="test-controls">
+                <button id="send-request">Send Request</button>
+                <button id="ping-webhook">Simple Ping Test</button>
+                <button id="clear-log">Clear Log</button>
+            </div>
+            
+            <div class="response-container" id="response-container" style="display: none;">
+                <h3>Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+            
+            <div class="log-container" id="log-container">
+                <div class="log-entry info">Webhook diagnostics tool loaded.</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM elements
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const requestPayloadInput = document.getElementById('request-payload');
+        const optionCors = document.getElementById('option-cors');
+        const optionCredentials = document.getElementById('option-credentials');
+        const optionJson = document.getElementById('option-json');
+        const sendRequestBtn = document.getElementById('send-request');
+        const pingWebhookBtn = document.getElementById('ping-webhook');
+        const clearLogBtn = document.getElementById('clear-log');
+        const logContainer = document.getElementById('log-container');
+        const responseContainer = document.getElementById('response-container');
+        const responseData = document.getElementById('response-data');
+        
+        // Logging function
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        // Send request button
+        sendRequestBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+            
+            let payload;
+            try {
+                payload = JSON.parse(requestPayloadInput.value);
+                log(`Sending request to: ${webhookUrl}`);
+            } catch (error) {
+                log(`Invalid JSON payload: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Prepare fetch options
+            const fetchOptions = {
+                method: 'POST',
+                headers: {}
+            };
+            
+            // Add content type if JSON
+            if (optionJson.checked) {
+                fetchOptions.headers['Content-Type'] = 'application/json';
+                fetchOptions.body = JSON.stringify(payload);
+            } else {
+                // Use form data
+                const formData = new FormData();
+                Object.entries(payload).forEach(([key, value]) => {
+                    formData.append(key, typeof value === 'object' ? JSON.stringify(value) : value);
+                });
+                fetchOptions.body = formData;
+            }
+            
+            // Add credentials if needed
+            if (optionCredentials.checked) {
+                fetchOptions.credentials = 'include';
+            }
+            
+            // Add CORS mode if needed
+            if (optionCors.checked) {
+                fetchOptions.mode = 'cors';
+            }
+            
+            log(`Request options: ${JSON.stringify(fetchOptions, null, 2)}`);
+            
+            // Send the request
+            fetch(webhookUrl, fetchOptions)
+                .then(response => {
+                    log(`Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                    
+                    // Get response headers
+                    const headers = {};
+                    response.headers.forEach((value, key) => {
+                        headers[key] = value;
+                    });
+                    log(`Response headers: ${JSON.stringify(headers, null, 2)}`);
+                    
+                    // Get response body
+                    return response.text().then(text => {
+                        if (!response.ok) {
+                            throw new Error(`Network response was not ok: ${response.status} ${response.statusText} - ${text}`);
+                        }
+                        
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            log('Response is not valid JSON, returning as text', 'info');
+                            return { response: text, isTextResponse: true };
+                        }
+                    });
+                })
+                .then(data => {
+                    log('Response received and parsed', 'success');
+                    
+                    // Display the response
+                    responseContainer.style.display = 'block';
+                    
+                    if (data.isTextResponse) {
+                        responseData.textContent = data.response;
+                    } else {
+                        responseData.textContent = JSON.stringify(data, null, 2);
+                    }
+                })
+                .catch(error => {
+                    log(`Error: ${error.message}`, 'error');
+                    
+                    // Show error in response container
+                    responseContainer.style.display = 'block';
+                    responseData.textContent = `Error: ${error.message}`;
+                });
+        });
+        
+        // Ping webhook button (simple GET request)
+        pingWebhookBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+            
+            log(`Sending simple GET ping to: ${webhookUrl}`);
+            
+            fetch(webhookUrl, { method: 'GET' })
+                .then(response => {
+                    log(`Ping response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                    return response.text();
+                })
+                .then(text => {
+                    log(`Ping response: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`, 'info');
+                    
+                    // Display the response
+                    responseContainer.style.display = 'block';
+                    responseData.textContent = text;
+                })
+                .catch(error => {
+                    log(`Ping error: ${error.message}`, 'error');
+                    
+                    // Show error in response container
+                    responseContainer.style.display = 'block';
+                    responseData.textContent = `Error: ${error.message}`;
+                });
+        });
+        
+        // Clear log button
+        clearLogBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            log('Log cleared', 'info');
+        });
+        
+        // Initialize with current timestamp
+        try {
+            const payload = JSON.parse(requestPayloadInput.value);
+            payload.timestamp = new Date().toISOString();
+            requestPayloadInput.value = JSON.stringify(payload, null, 2);
+        } catch (e) {
+            // Ignore parsing errors in initial payload
+        }
+    </script>
+</body>
+</html>

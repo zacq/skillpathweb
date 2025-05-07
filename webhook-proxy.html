@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Proxy Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1, h2 {
+            color: #1a3c6e;
+        }
+        
+        p {
+            line-height: 1.6;
+        }
+        
+        .info-box {
+            background-color: #e1f5fe;
+            border-left: 4px solid #03a9f4;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .warning-box {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: monospace;
+        }
+        
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background-color: #009a98;
+        }
+        
+        .response-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        #status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: #ccc;
+            margin-right: 10px;
+        }
+        
+        #status-indicator.success {
+            background-color: #4caf50;
+        }
+        
+        #status-indicator.error {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Webhook Proxy Test</h1>
+        <p>This page helps test webhook requests through a public CORS proxy to bypass CORS restrictions.</p>
+        
+        <div class="info-box">
+            <p><strong>Note:</strong> This is a client-side solution using a public CORS proxy service. For production use, you should implement a proper server-side proxy.</p>
+        </div>
+        
+        <div class="warning-box">
+            <p><strong>Warning:</strong> Using public CORS proxies may expose your data to third parties. Do not send sensitive information through these proxies.</p>
+        </div>
+        
+        <div class="test-section">
+            <h2>Test Webhook Through Proxy</h2>
+            
+            <div>
+                <label for="webhook-url">Webhook URL:</label>
+                <input type="text" id="webhook-url" value="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f" placeholder="Enter webhook URL">
+            </div>
+            
+            <div>
+                <label for="message">Message:</label>
+                <input type="text" id="message" placeholder="Enter a test message" value="Hello from the proxy test!">
+            </div>
+            
+            <div>
+                <label for="proxy-select">Select Proxy:</label>
+                <select id="proxy-select">
+                    <option value="https://cors-anywhere.herokuapp.com/">CORS Anywhere</option>
+                    <option value="https://api.allorigins.win/raw?url=">All Origins</option>
+                    <option value="https://corsproxy.io/?">CORS Proxy.io</option>
+                    <option value="direct">Direct (No Proxy)</option>
+                </select>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <button id="send-button">Send Request</button>
+                <span id="status-text">Ready</span>
+                <span id="status-indicator"></span>
+            </div>
+            
+            <div class="response-container" id="response-container">
+                <h3>Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Alternative Solutions</h2>
+            
+            <p>If the proxy test doesn't work, consider these alternatives:</p>
+            
+            <ol>
+                <li><strong>Server-side proxy:</strong> Implement a proxy on your own server to forward requests to the webhook.</li>
+                <li><strong>JSONP:</strong> If the webhook supports JSONP, you can use that to bypass CORS restrictions.</li>
+                <li><strong>Contact webhook provider:</strong> Ask the webhook provider to enable CORS for your domain.</li>
+                <li><strong>Browser extension:</strong> Use a browser extension like "CORS Unblock" for testing (not for production).</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        // DOM elements
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const messageInput = document.getElementById('message');
+        const proxySelect = document.getElementById('proxy-select');
+        const sendButton = document.getElementById('send-button');
+        const statusText = document.getElementById('status-text');
+        const statusIndicator = document.getElementById('status-indicator');
+        const responseContainer = document.getElementById('response-container');
+        const responseData = document.getElementById('response-data');
+        
+        // Send button click handler
+        sendButton.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            const message = messageInput.value.trim();
+            const proxyUrl = proxySelect.value;
+            
+            if (!webhookUrl) {
+                updateStatus('Please enter a webhook URL', 'error');
+                return;
+            }
+            
+            if (!message) {
+                updateStatus('Please enter a message', 'error');
+                return;
+            }
+            
+            // Prepare the request URL
+            let requestUrl = webhookUrl;
+            if (proxyUrl !== 'direct') {
+                requestUrl = proxyUrl + encodeURIComponent(webhookUrl);
+            }
+            
+            // Prepare the payload
+            const payload = {
+                message: message,
+                timestamp: new Date().toISOString(),
+                sessionId: 'proxy_test_' + Date.now(),
+                source: window.location.href,
+                userAgent: navigator.userAgent,
+                isProxyTest: true
+            };
+            
+            // Update status
+            updateStatus('Sending request...', 'pending');
+            
+            // Send the request
+            fetch(requestUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                updateStatus(`Response received: ${response.status} ${response.statusText}`, 
+                             response.ok ? 'success' : 'error');
+                
+                return response.text().then(text => {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        return { rawResponse: text };
+                    }
+                });
+            })
+            .then(data => {
+                // Display the response
+                responseContainer.style.display = 'block';
+                responseData.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                updateStatus(`Error: ${error.message}`, 'error');
+                
+                // Show error in response container
+                responseContainer.style.display = 'block';
+                responseData.textContent = `Error: ${error.message}`;
+            });
+        });
+        
+        // Update status function
+        function updateStatus(message, type) {
+            statusText.textContent = message;
+            statusIndicator.className = type;
+            console.log(`[${type}] ${message}`);
+        }
+    </script>
+</body>
+</html>

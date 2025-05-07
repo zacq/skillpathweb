@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Webhook Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .output {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Minimal Webhook Test</h1>
+        <p>This is a minimal test page for the webhook. It uses different methods to test the webhook connection.</p>
+        
+        <div>
+            <button id="test-fetch">Test with Fetch API</button>
+            <button id="test-xhr">Test with XMLHttpRequest</button>
+            <button id="test-form">Test with Form Submit</button>
+        </div>
+        
+        <div class="output" id="output">
+            <p>Results will appear here...</p>
+        </div>
+        
+        <!-- Hidden form for form submit test -->
+        <form id="webhook-form" action="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f" method="post" target="response-frame" style="display:none;">
+            <input type="hidden" name="message" value="Test message from form">
+            <input type="hidden" name="timestamp" value="">
+            <input type="hidden" name="sessionId" value="form_test">
+        </form>
+        
+        <!-- Hidden iframe for form response -->
+        <iframe name="response-frame" id="response-frame" style="display:none;"></iframe>
+    </div>
+    
+    <script>
+        // DOM elements
+        const output = document.getElementById('output');
+        const webhookForm = document.getElementById('webhook-form');
+        const responseFrame = document.getElementById('response-frame');
+        
+        // Webhook URL
+        const webhookUrl = 'https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f';
+        
+        // Test data
+        const testData = {
+            message: 'Test message from minimal test page',
+            timestamp: new Date().toISOString(),
+            sessionId: 'minimal_test_' + Date.now(),
+            source: 'minimal-webhook-test.html'
+        };
+        
+        // Update timestamp in form
+        document.querySelector('input[name="timestamp"]').value = testData.timestamp;
+        
+        // Log function
+        function log(message) {
+            const logEntry = document.createElement('pre');
+            logEntry.textContent = message;
+            output.appendChild(logEntry);
+            console.log(message);
+        }
+        
+        // Clear output
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+        
+        // Test with Fetch API
+        document.getElementById('test-fetch').addEventListener('click', function() {
+            clearOutput();
+            log('Testing webhook with Fetch API...');
+            log(`Sending to: ${webhookUrl}`);
+            log(`Data: ${JSON.stringify(testData, null, 2)}`);
+            
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(testData)
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`);
+                return response.text();
+            })
+            .then(text => {
+                log('Response received:');
+                log(text);
+                
+                try {
+                    const json = JSON.parse(text);
+                    log('Parsed JSON response:');
+                    log(JSON.stringify(json, null, 2));
+                } catch (e) {
+                    log('Response is not valid JSON');
+                }
+            })
+            .catch(error => {
+                log(`Error: ${error.message}`);
+            });
+        });
+        
+        // Test with XMLHttpRequest
+        document.getElementById('test-xhr').addEventListener('click', function() {
+            clearOutput();
+            log('Testing webhook with XMLHttpRequest...');
+            log(`Sending to: ${webhookUrl}`);
+            log(`Data: ${JSON.stringify(testData, null, 2)}`);
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', webhookUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onload = function() {
+                log(`Response status: ${xhr.status} ${xhr.statusText}`);
+                log('Response received:');
+                log(xhr.responseText);
+                
+                try {
+                    const json = JSON.parse(xhr.responseText);
+                    log('Parsed JSON response:');
+                    log(JSON.stringify(json, null, 2));
+                } catch (e) {
+                    log('Response is not valid JSON');
+                }
+            };
+            
+            xhr.onerror = function() {
+                log(`Error: Network error occurred`);
+            };
+            
+            xhr.send(JSON.stringify(testData));
+        });
+        
+        // Test with Form Submit
+        document.getElementById('test-form').addEventListener('click', function() {
+            clearOutput();
+            log('Testing webhook with Form Submit...');
+            log(`Sending to: ${webhookUrl}`);
+            log('Note: Form submissions may not work with JSON-only endpoints');
+            
+            // Update form action just in case
+            webhookForm.action = webhookUrl;
+            
+            // Submit the form
+            webhookForm.submit();
+            
+            // Try to get response from iframe
+            responseFrame.onload = function() {
+                try {
+                    const frameContent = responseFrame.contentDocument.body.textContent;
+                    log('Response received:');
+                    log(frameContent);
+                } catch (e) {
+                    log('Could not access iframe content due to same-origin policy');
+                }
+            };
+        });
+        
+        // Initial log
+        log('Minimal webhook test page loaded. Click a button to test.');
+    </script>
+</body>
+</html>

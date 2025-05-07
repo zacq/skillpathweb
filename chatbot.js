@@ -391,31 +391,134 @@ class SkillpathChatbot {
             return;
         }
 
-        fetch(this.options.webhookUrl, {
+        // List of CORS proxies to try (in order of preference)
+        const corsProxies = [
+            'https://corsproxy.io/?',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.allorigins.win/raw?url='
+        ];
+
+        // Start with the first proxy
+        this.sendWithProxy(message, 0, corsProxies);
+    }
+
+    sendWithProxy(message, proxyIndex, corsProxies) {
+        // If we've tried all proxies, try direct request as last resort
+        if (proxyIndex >= corsProxies.length) {
+            console.log('All proxies failed, trying direct request');
+            this.sendDirectRequest(message);
+            return;
+        }
+
+        const corsProxyUrl = corsProxies[proxyIndex];
+        const targetUrl = encodeURIComponent(this.options.webhookUrl);
+        const proxyUrl = corsProxyUrl + targetUrl;
+
+        console.log(`Using CORS proxy (${proxyIndex + 1}/${corsProxies.length}):`, proxyUrl);
+
+        // Prepare the payload
+        const payload = {
+            message: message,
+            timestamp: new Date().toISOString(),
+            sessionId: this.getSessionId(),
+            source: window.location.href,
+            userAgent: navigator.userAgent
+        };
+
+        fetch(proxyUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Required by some CORS proxies
             },
-            body: JSON.stringify({
-                message: message,
-                timestamp: new Date().toISOString(),
-                sessionId: this.getSessionId()
-            })
+            mode: 'cors', // Add CORS mode
+            credentials: 'omit', // Don't send credentials through proxy
+            body: JSON.stringify(payload)
         })
         .then(response => {
+            console.log(`Webhook response status: ${response.status} ${response.statusText}`);
+
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                // Get the response text to include in the error message
+                return response.text().then(text => {
+                    throw new Error(`Network response was not ok: ${response.status} ${response.statusText} - ${text}`);
+                });
             }
-            return response.json();
+
+            // Try to parse as JSON
+            return response.json().catch(error => {
+                console.error('Error parsing response as JSON:', error);
+                throw new Error('Invalid JSON response from webhook');
+            });
         })
         .then(data => {
             this.removeTypingIndicator();
             this.addMessage(data.response || 'Thank you for your message!', 'received');
         })
         .catch(error => {
-            console.error('Error sending message to webhook:', error);
+            console.error(`Error with proxy ${proxyIndex + 1}/${corsProxies.length}:`, error);
+
+            // Try the next proxy
+            this.sendWithProxy(message, proxyIndex + 1, corsProxies);
+        });
+    }
+
+    sendDirectRequest(message) {
+        // Prepare the payload
+        const payload = {
+            message: message,
+            timestamp: new Date().toISOString(),
+            sessionId: this.getSessionId(),
+            source: window.location.href,
+            userAgent: navigator.userAgent
+        };
+
+        fetch(this.options.webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            mode: 'cors', // Try with CORS mode
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            console.log(`Direct webhook response status: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+                // Get the response text to include in the error message
+                return response.text().then(text => {
+                    throw new Error(`Network response was not ok: ${response.status} ${response.statusText} - ${text}`);
+                });
+            }
+
+            // Try to parse as JSON
+            return response.json().catch(error => {
+                console.error('Error parsing response as JSON:', error);
+                throw new Error('Invalid JSON response from webhook');
+            });
+        })
+        .then(data => {
             this.removeTypingIndicator();
-            this.addMessage('Sorry, I cannot process your request at the moment. Please try again later.', 'received');
+            this.addMessage(data.response || 'Thank you for your message!', 'received');
+        })
+        .catch(error => {
+            console.error('All request methods failed:', error);
+            this.removeTypingIndicator();
+
+            // Provide more specific error message based on the error type
+            let errorMessage = 'Sorry, I cannot process your request at the moment. Please try again later.';
+
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection and try again.';
+            } else if (error.message.includes('Timeout')) {
+                errorMessage = 'Request timed out. The server took too long to respond. Please try again later.';
+            } else if (error.message.includes('not ok')) {
+                errorMessage = 'The server returned an error. Our team has been notified and is working on a fix.';
+            } else if (error.message.includes('CORS')) {
+                errorMessage = 'Cross-origin request blocked. Our team has been notified of this issue.';
+            }
+
+            this.addMessage(errorMessage, 'received');
         });
     }
 

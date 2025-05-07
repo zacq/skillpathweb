@@ -45,7 +45,7 @@ return [
       receivedMessage: $input.item.json.message,
       sessionId: $input.item.json.sessionId,
       timestamp: $input.item.json.timestamp,
-      
+
       // Generate a response (this is where you can add your custom logic)
       response: processMessage($input.item.json.message)
     }
@@ -55,7 +55,7 @@ return [
 // Simple function to generate responses based on keywords
 function processMessage(message) {
   message = message.toLowerCase();
-  
+
   if (message.includes('hello') || message.includes('hi')) {
     return "Hello! How can I help you with your professional development today?";
   }
@@ -100,7 +100,7 @@ function processMessage(message) {
 ```javascript
 const chatbot = new SkillpathChatbot({
     // Other options...
-    webhookUrl: 'https://your-n8n-instance.com/webhook/skillpath-chatbot',
+    webhookUrl: 'https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f',
     // Other options...
 });
 ```
@@ -127,7 +127,9 @@ sendToWebhook(message) {
         body: JSON.stringify({
             message: message,
             timestamp: new Date().toISOString(),
-            sessionId: this.getSessionId()
+            sessionId: this.getSessionId(),
+            source: window.location.href,
+            userAgent: navigator.userAgent
         })
     })
     // ...
@@ -142,6 +144,20 @@ You can enhance your chatbot by connecting your n8n workflow to external service
 2. **CRM Systems**: Log conversations in your CRM
 3. **Email Services**: Send follow-up emails based on chat interactions
 4. **Database**: Store conversation history for analytics
+
+## Testing the Webhook Integration
+
+A webhook test page has been created to help you verify that the webhook integration is working correctly:
+
+1. Open the `webhook-test.html` file in your browser
+2. Enter a test message in the input field
+3. Click the "Send Test Message" button
+4. The page will send a direct request to the webhook and display the response
+
+This test page is useful for:
+- Verifying that the webhook URL is correct and accessible
+- Testing the webhook response format
+- Debugging any issues with the webhook integration
 
 ## Troubleshooting
 
