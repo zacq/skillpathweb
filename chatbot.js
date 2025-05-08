@@ -346,8 +346,50 @@ class SkillpathChatbot {
         // Show typing indicator
         this.showTypingIndicator();
 
+        // Track this message in conversation history
+        this.trackMessageInHistory(message, 'user');
+
         // Send message to webhook
         this.sendToWebhook(message);
+    }
+
+    trackMessageInHistory(message, sender) {
+        try {
+            // Get current session data
+            const sessionData = localStorage.getItem('skillpath_chat_session');
+
+            if (sessionData) {
+                const parsedData = JSON.parse(sessionData);
+
+                // Initialize conversation array if it doesn't exist
+                if (!parsedData.conversation) {
+                    parsedData.conversation = [];
+                }
+
+                // Add message to conversation history
+                parsedData.conversation.push({
+                    sender: sender,
+                    message: message,
+                    timestamp: new Date().toISOString()
+                });
+
+                // Limit conversation history to last 20 messages to prevent localStorage from getting too large
+                if (parsedData.conversation.length > 20) {
+                    parsedData.conversation = parsedData.conversation.slice(-20);
+                }
+
+                // Update last activity
+                parsedData.lastActivity = Date.now();
+
+                // Save updated session data
+                localStorage.setItem('skillpath_chat_session', JSON.stringify(parsedData));
+
+                console.log('Added message to conversation history');
+            }
+        } catch (error) {
+            console.error('Error tracking message in history:', error);
+            // Non-critical error, don't disrupt the user experience
+        }
     }
 
     addMessage(message, type) {
@@ -416,13 +458,41 @@ class SkillpathChatbot {
 
         console.log(`Using CORS proxy (${proxyIndex + 1}/${corsProxies.length}):`, proxyUrl);
 
-        // Prepare the payload
+        // Get session information
+        const sessionId = this.getSessionId();
+
+        // Get conversation history if available
+        let conversationHistory = [];
+        try {
+            const sessionData = localStorage.getItem('skillpath_chat_session');
+            if (sessionData) {
+                const parsedData = JSON.parse(sessionData);
+                if (parsedData.conversation && Array.isArray(parsedData.conversation)) {
+                    // Get the last 5 messages for context (or fewer if there aren't 5 yet)
+                    conversationHistory = parsedData.conversation.slice(-5);
+                }
+            }
+        } catch (error) {
+            console.error('Error retrieving conversation history:', error);
+        }
+
+        // Prepare the payload with enhanced session data
         const payload = {
             message: message,
             timestamp: new Date().toISOString(),
-            sessionId: this.getSessionId(),
+            session: {
+                id: sessionId,
+                isNew: sessionId.startsWith('temp_session_') || sessionId.includes('_' + Date.now().toString().substring(0, 8)),
+                type: sessionId.startsWith('temp_session_') ? 'temporary' : 'persistent'
+            },
+            conversation: {
+                history: conversationHistory,
+                messageCount: conversationHistory.length
+            },
             source: window.location.href,
-            userAgent: navigator.userAgent
+            userAgent: navigator.userAgent,
+            pageTitle: document.title,
+            referrer: document.referrer || null
         };
 
         fetch(proxyUrl, {
@@ -453,7 +523,11 @@ class SkillpathChatbot {
         })
         .then(data => {
             this.removeTypingIndicator();
-            this.addMessage(data.response || 'Thank you for your message!', 'received');
+            const botResponse = data.response || 'Thank you for your message!';
+            this.addMessage(botResponse, 'received');
+
+            // Track bot response in conversation history
+            this.trackMessageInHistory(botResponse, 'bot');
         })
         .catch(error => {
             console.error(`Error with proxy ${proxyIndex + 1}/${corsProxies.length}:`, error);
@@ -464,13 +538,41 @@ class SkillpathChatbot {
     }
 
     sendDirectRequest(message) {
-        // Prepare the payload
+        // Get session information
+        const sessionId = this.getSessionId();
+
+        // Get conversation history if available
+        let conversationHistory = [];
+        try {
+            const sessionData = localStorage.getItem('skillpath_chat_session');
+            if (sessionData) {
+                const parsedData = JSON.parse(sessionData);
+                if (parsedData.conversation && Array.isArray(parsedData.conversation)) {
+                    // Get the last 5 messages for context (or fewer if there aren't 5 yet)
+                    conversationHistory = parsedData.conversation.slice(-5);
+                }
+            }
+        } catch (error) {
+            console.error('Error retrieving conversation history:', error);
+        }
+
+        // Prepare the payload with enhanced session data
         const payload = {
             message: message,
             timestamp: new Date().toISOString(),
-            sessionId: this.getSessionId(),
+            session: {
+                id: sessionId,
+                isNew: sessionId.startsWith('temp_session_') || sessionId.includes('_' + Date.now().toString().substring(0, 8)),
+                type: sessionId.startsWith('temp_session_') ? 'temporary' : 'persistent'
+            },
+            conversation: {
+                history: conversationHistory,
+                messageCount: conversationHistory.length
+            },
             source: window.location.href,
-            userAgent: navigator.userAgent
+            userAgent: navigator.userAgent,
+            pageTitle: document.title,
+            referrer: document.referrer || null
         };
 
         fetch(this.options.webhookUrl, {
@@ -499,7 +601,11 @@ class SkillpathChatbot {
         })
         .then(data => {
             this.removeTypingIndicator();
-            this.addMessage(data.response || 'Thank you for your message!', 'received');
+            const botResponse = data.response || 'Thank you for your message!';
+            this.addMessage(botResponse, 'received');
+
+            // Track bot response in conversation history
+            this.trackMessageInHistory(botResponse, 'bot');
         })
         .catch(error => {
             console.error('All request methods failed:', error);
@@ -519,16 +625,86 @@ class SkillpathChatbot {
             }
 
             this.addMessage(errorMessage, 'received');
+
+            // Track error message in conversation history
+            this.trackMessageInHistory(errorMessage, 'error');
         });
     }
 
     getSessionId() {
         // Generate or retrieve a session ID for conversation tracking
-        let sessionId = localStorage.getItem('skillpath_chat_session');
-        if (!sessionId) {
-            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('skillpath_chat_session', sessionId);
+        let sessionId;
+        const sessionExpiry = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+        try {
+            // Try to get existing session data from localStorage
+            const sessionData = localStorage.getItem('skillpath_chat_session');
+
+            if (sessionData) {
+                try {
+                    // Parse the session data
+                    const parsedData = JSON.parse(sessionData);
+
+                    // Check if session is valid and not expired
+                    if (parsedData &&
+                        parsedData.id &&
+                        parsedData.id.startsWith('session_') &&
+                        parsedData.created &&
+                        (Date.now() - parsedData.created < sessionExpiry)) {
+
+                        // Valid session found
+                        sessionId = parsedData.id;
+
+                        // Update the last activity timestamp
+                        parsedData.lastActivity = Date.now();
+                        localStorage.setItem('skillpath_chat_session', JSON.stringify(parsedData));
+
+                        console.log('Using existing session:', sessionId);
+                    } else {
+                        // Session expired or invalid format
+                        console.log('Session expired or invalid, creating new session');
+                        sessionId = this.createNewSession();
+                    }
+                } catch (parseError) {
+                    // Error parsing JSON, create new session
+                    console.error('Error parsing session data:', parseError);
+                    sessionId = this.createNewSession();
+                }
+            } else {
+                // No existing session, create new one
+                sessionId = this.createNewSession();
+            }
+        } catch (storageError) {
+            // localStorage not available (e.g., private browsing mode)
+            console.error('localStorage not available:', storageError);
+
+            // Generate a temporary session ID (won't persist)
+            sessionId = 'temp_session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            console.log('Created temporary session (not persistent):', sessionId);
         }
+
+        return sessionId;
+    }
+
+    createNewSession() {
+        // Generate a new session ID
+        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        // Create session data object
+        const sessionData = {
+            id: sessionId,
+            created: Date.now(),
+            lastActivity: Date.now()
+        };
+
+        try {
+            // Store in localStorage
+            localStorage.setItem('skillpath_chat_session', JSON.stringify(sessionData));
+            console.log('Created new session:', sessionId);
+        } catch (error) {
+            console.error('Error storing session data:', error);
+        }
+
         return sessionId;
     }
 }

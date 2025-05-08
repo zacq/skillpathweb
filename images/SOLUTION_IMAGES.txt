@@ -1,0 +1,19 @@
+SOLUTION IMAGES INSTRUCTIONS
+
+The website is now configured to use the following image files in the solutions page:
+
+1. individual-coaching-illustration.png - For the "For Individuals" tab
+2. team-coaching-illustration.png - For the "For Teams" tab
+3. organization-coaching-illustration.png - For the "For Organizations" tab
+
+To add your images:
+1. Place your image files in this directory (images/)
+2. Rename them according to the names above or update the image paths in solutions.html
+
+Image recommendations:
+- Dimensions: Around 600x400 pixels
+- Format: PNG with transparent background works best
+- Content: Illustrations related to individual coaching, team coaching, and organizational coaching
+- File size: Optimize for web (under 200KB if possible)
+
+The images will automatically be responsive and will look good on all screen sizes.
