@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skillpath.ai Chatbot Debug Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1a3c6e;
+        }
+        p {
+            line-height: 1.6;
+            color: #333;
+        }
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #009a98;
+        }
+        .console-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-radius: 4px;
+            color: #f0f0f0;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .console-line {
+            margin-bottom: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .console-error {
+            color: #ff6b6b;
+        }
+        .console-warning {
+            color: #feca57;
+        }
+        .console-info {
+            color: #54a0ff;
+        }
+        .console-success {
+            color: #1dd1a1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Skillpath.ai Chatbot Debug Test</h1>
+        <p>This page helps debug issues with the chatbot webhook response handling.</p>
+
+        <div class="test-section">
+            <div class="input-group">
+                <label for="webhook-url">Webhook URL:</label>
+                <input type="text" id="webhook-url" value="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f">
+            </div>
+
+            <div>
+                <button id="init-chatbot">Initialize Debug Chatbot</button>
+                <button id="clear-console">Clear Console</button>
+            </div>
+
+            <div class="console-container" id="console-container">
+                <div class="console-line console-info">Console initialized. Click "Initialize Debug Chatbot" to begin.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the debug chatbot script -->
+    <script src="chatbot-debug.js"></script>
+
+    <script>
+        // Override console methods to capture logs
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const originalConsoleInfo = console.info;
+
+        // DOM elements
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const initChatbotBtn = document.getElementById('init-chatbot');
+        const clearConsoleBtn = document.getElementById('clear-console');
+        const consoleContainer = document.getElementById('console-container');
+
+        // Global chatbot variable
+        let chatbot = null;
+
+        // Add log to console container
+        function addConsoleLog(message, type = 'info') {
+            const logLine = document.createElement('div');
+            logLine.className = `console-line console-${type}`;
+            
+            // Format objects and arrays
+            if (typeof message === 'object' && message !== null) {
+                try {
+                    message = JSON.stringify(message, null, 2);
+                } catch (e) {
+                    message = message.toString();
+                }
+            }
+            
+            logLine.textContent = message;
+            consoleContainer.appendChild(logLine);
+            consoleContainer.scrollTop = consoleContainer.scrollHeight;
+        }
+
+        // Override console methods
+        console.log = function() {
+            originalConsoleLog.apply(console, arguments);
+            addConsoleLog(arguments[0], 'info');
+        };
+
+        console.error = function() {
+            originalConsoleError.apply(console, arguments);
+            addConsoleLog(arguments[0], 'error');
+        };
+
+        console.warn = function() {
+            originalConsoleWarn.apply(console, arguments);
+            addConsoleLog(arguments[0], 'warning');
+        };
+
+        console.info = function() {
+            originalConsoleInfo.apply(console, arguments);
+            addConsoleLog(arguments[0], 'info');
+        };
+
+        // Initialize button
+        initChatbotBtn.addEventListener('click', function() {
+            try {
+                const webhookUrl = webhookUrlInput.value.trim();
+                
+                if (!webhookUrl) {
+                    console.error('Please enter a webhook URL');
+                    return;
+                }
+                
+                console.log('Initializing debug chatbot...');
+
+                // If a chatbot already exists, remove it
+                if (chatbot) {
+                    if (chatbot.container && chatbot.container.parentNode) {
+                        chatbot.container.parentNode.removeChild(chatbot.container);
+                    }
+                    console.log('Removed existing chatbot instance');
+                }
+
+                // Create new chatbot instance
+                chatbot = new SkillpathChatbotDebug({
+                    position: 'bottom-right',
+                    title: 'Skillpath Assistant (Debug)',
+                    welcomeMessage: 'Hello! 👋 This is the DEBUG version of the chatbot. How can I help with your professional development today?',
+                    webhookUrl: webhookUrl,
+                    primaryColor: '#00b3b0',
+                    secondaryColor: '#1a3c6e'
+                });
+
+                console.log('Debug chatbot initialized successfully');
+            } catch (error) {
+                console.error(`Error initializing chatbot: ${error.message}`);
+            }
+        });
+
+        // Clear console
+        clearConsoleBtn.addEventListener('click', function() {
+            consoleContainer.innerHTML = '';
+            console.log('Console cleared');
+        });
+
+        // Log page load
+        console.log('Debug test page loaded');
+    </script>
+</body>
+</html>

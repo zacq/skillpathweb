@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Response Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #1a3c6e;
+        }
+        .test-section {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 150px;
+            font-family: monospace;
+        }
+        button {
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #009a98;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 15px;
+            background-color: #eee;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-bottom: none;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Webhook Response Debug Tool</h1>
+        <p>This tool helps diagnose issues with webhook responses from n8n.</p>
+
+        <div class="test-section">
+            <div class="input-group">
+                <label for="webhook-url">Webhook URL:</label>
+                <input type="text" id="webhook-url" value="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f">
+            </div>
+
+            <div class="input-group">
+                <label for="message">Test Message:</label>
+                <input type="text" id="message" placeholder="Enter a test message" value="Hello, this is a test message">
+            </div>
+
+            <div class="input-group">
+                <label for="payload">Full Request Payload (JSON):</label>
+                <textarea id="payload">{
+  "message": "Hello, this is a test message",
+  "timestamp": "2023-07-20T12:34:56.789Z",
+  "session": {
+    "id": "test_session_123",
+    "isNew": true,
+    "type": "test"
+  },
+  "source": "webhook-response-debug.html",
+  "userAgent": "Debug Tool"
+}</textarea>
+            </div>
+
+            <div>
+                <button id="send-direct">Send Direct Request</button>
+                <button id="send-cors-proxy">Send via CORS Proxy</button>
+                <button id="clear-log">Clear Log</button>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="response">Response</div>
+                <div class="tab" data-tab="raw">Raw Response</div>
+                <div class="tab" data-tab="headers">Response Headers</div>
+            </div>
+
+            <div class="response-container">
+                <div class="tab-content active" id="response-tab">
+                    <h3>Parsed Response:</h3>
+                    <pre id="response-data">No response yet</pre>
+                </div>
+                <div class="tab-content" id="raw-tab">
+                    <h3>Raw Response:</h3>
+                    <pre id="raw-data">No response yet</pre>
+                </div>
+                <div class="tab-content" id="headers-tab">
+                    <h3>Response Headers:</h3>
+                    <pre id="headers-data">No response yet</pre>
+                </div>
+            </div>
+
+            <div class="log-container" id="log-container">
+                <div class="log-entry info">Webhook response debug tool loaded.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const messageInput = document.getElementById('message');
+        const payloadInput = document.getElementById('payload');
+        const sendDirectBtn = document.getElementById('send-direct');
+        const sendCorsProxyBtn = document.getElementById('send-cors-proxy');
+        const clearLogBtn = document.getElementById('clear-log');
+        const logContainer = document.getElementById('log-container');
+        const responseData = document.getElementById('response-data');
+        const rawData = document.getElementById('raw-data');
+        const headersData = document.getElementById('headers-data');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        // Tab switching
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs and contents
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                // Show corresponding content
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+
+        // Log function
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = message;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Update payload with current message
+        messageInput.addEventListener('input', function() {
+            try {
+                const payload = JSON.parse(payloadInput.value);
+                payload.message = messageInput.value;
+                payload.timestamp = new Date().toISOString();
+                payloadInput.value = JSON.stringify(payload, null, 2);
+            } catch (e) {
+                // Ignore parsing errors
+            }
+        });
+
+        // Send direct request
+        sendDirectBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(payloadInput.value);
+            } catch (e) {
+                log(`Invalid JSON payload: ${e.message}`, 'error');
+                return;
+            }
+
+            log('Sending direct request to webhook...', 'info');
+            log(`URL: ${webhookUrl}`, 'info');
+            log(`Payload: ${JSON.stringify(payload, null, 2)}`, 'info');
+
+            // Reset response displays
+            responseData.textContent = 'Waiting for response...';
+            rawData.textContent = 'Waiting for response...';
+            headersData.textContent = 'Waiting for response...';
+
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                mode: 'cors',
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                // Extract and display headers
+                const headers = {};
+                response.headers.forEach((value, name) => {
+                    headers[name] = value;
+                });
+                headersData.textContent = JSON.stringify(headers, null, 2);
+                log('Response headers captured', 'info');
+                
+                // Get the response text
+                return response.text().then(text => {
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        statusText: response.statusText,
+                        text: text
+                    };
+                });
+            })
+            .then(result => {
+                // Display raw response
+                rawData.textContent = result.text;
+                log('Raw response captured', 'info');
+                
+                // Try to parse as JSON
+                try {
+                    const json = JSON.parse(result.text);
+                    log('Response parsed as JSON successfully', 'success');
+                    responseData.textContent = JSON.stringify(json, null, 2);
+                    
+                    // Check for response property
+                    if (json.response) {
+                        log(`Bot response: "${json.response}"`, 'success');
+                    } else {
+                        log('JSON response does not contain a "response" property', 'warning');
+                        log('Expected format: { "response": "Bot message here" }', 'info');
+                    }
+                } catch (e) {
+                    log(`Response is not valid JSON: ${e.message}`, 'error');
+                    responseData.textContent = `Error parsing JSON: ${e.message}\n\nRaw response: ${result.text}`;
+                }
+            })
+            .catch(error => {
+                log(`Network error: ${error.message}`, 'error');
+                responseData.textContent = `Error: ${error.message}`;
+                rawData.textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Send via CORS proxy
+        sendCorsProxyBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(payloadInput.value);
+            } catch (e) {
+                log(`Invalid JSON payload: ${e.message}`, 'error');
+                return;
+            }
+
+            // Use CORS proxy
+            const corsProxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = encodeURIComponent(webhookUrl);
+            const proxyUrl = corsProxyUrl + targetUrl;
+
+            log('Sending request via CORS proxy...', 'info');
+            log(`Proxy URL: ${proxyUrl}`, 'info');
+            log(`Original URL: ${webhookUrl}`, 'info');
+            log(`Payload: ${JSON.stringify(payload, null, 2)}`, 'info');
+
+            // Reset response displays
+            responseData.textContent = 'Waiting for response...';
+            rawData.textContent = 'Waiting for response...';
+            headersData.textContent = 'Waiting for response...';
+
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                // Extract and display headers
+                const headers = {};
+                response.headers.forEach((value, name) => {
+                    headers[name] = value;
+                });
+                headersData.textContent = JSON.stringify(headers, null, 2);
+                log('Response headers captured', 'info');
+                
+                // Get the response text
+                return response.text().then(text => {
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        statusText: response.statusText,
+                        text: text
+                    };
+                });
+            })
+            .then(result => {
+                // Display raw response
+                rawData.textContent = result.text;
+                log('Raw response captured', 'info');
+                
+                // Try to parse as JSON
+                try {
+                    const json = JSON.parse(result.text);
+                    log('Response parsed as JSON successfully', 'success');
+                    responseData.textContent = JSON.stringify(json, null, 2);
+                    
+                    // Check for response property
+                    if (json.response) {
+                        log(`Bot response: "${json.response}"`, 'success');
+                    } else {
+                        log('JSON response does not contain a "response" property', 'warning');
+                        log('Expected format: { "response": "Bot message here" }', 'info');
+                    }
+                } catch (e) {
+                    log(`Response is not valid JSON: ${e.message}`, 'error');
+                    responseData.textContent = `Error parsing JSON: ${e.message}\n\nRaw response: ${result.text}`;
+                }
+            })
+            .catch(error => {
+                log(`Network error: ${error.message}`, 'error');
+                responseData.textContent = `Error: ${error.message}`;
+                rawData.textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Clear log
+        clearLogBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            log('Log cleared', 'info');
+        });
+
+        // Initialize with current timestamp
+        try {
+            const payload = JSON.parse(payloadInput.value);
+            payload.timestamp = new Date().toISOString();
+            payloadInput.value = JSON.stringify(payload, null, 2);
+        } catch (e) {
+            // Ignore parsing errors in initial payload
+        }
+    </script>
+</body>
+</html>

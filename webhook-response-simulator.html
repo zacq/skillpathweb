@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>n8n Webhook Response Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #1a3c6e;
+        }
+        .test-section {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 150px;
+            font-family: monospace;
+        }
+        button {
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #009a98;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 15px;
+            background-color: #eee;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-bottom: none;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .checkbox-group {
+            margin-bottom: 10px;
+        }
+        .checkbox-group label {
+            display: inline;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>n8n Webhook Response Simulator</h1>
+        <p>This tool simulates an n8n webhook server to help debug chatbot response issues.</p>
+
+        <div class="test-section">
+            <h2>Server Configuration</h2>
+            
+            <div class="input-group">
+                <label for="port">Port:</label>
+                <input type="text" id="port" value="3000" disabled>
+                <p><small>Note: This simulator doesn't actually start a server. It just helps you understand the response format.</small></p>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="enable-cors" checked>
+                <label for="enable-cors">Enable CORS (Cross-Origin Resource Sharing)</label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="add-content-type" checked>
+                <label for="add-content-type">Add Content-Type: application/json header</label>
+            </div>
+
+            <h2>Response Configuration</h2>
+            
+            <div class="input-group">
+                <label for="response-format">Response Format:</label>
+                <textarea id="response-format">{
+  "response": "This is a test response from the webhook simulator.",
+  "timestamp": "2023-07-20T12:34:56.789Z",
+  "sessionId": "{{sessionId}}",
+  "receivedMessage": "{{message}}"
+}</textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="test-message">Test Message:</label>
+                <input type="text" id="test-message" value="Hello, this is a test message">
+            </div>
+
+            <button id="simulate-response">Simulate Response</button>
+            <button id="clear-log">Clear Log</button>
+
+            <div class="response-container" id="response-container" style="display: none;">
+                <h3>Simulated Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+
+            <div class="log-container" id="log-container">
+                <div class="log-entry info">Webhook response simulator loaded.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const portInput = document.getElementById('port');
+        const enableCorsCheckbox = document.getElementById('enable-cors');
+        const addContentTypeCheckbox = document.getElementById('add-content-type');
+        const responseFormatInput = document.getElementById('response-format');
+        const testMessageInput = document.getElementById('test-message');
+        const simulateResponseBtn = document.getElementById('simulate-response');
+        const clearLogBtn = document.getElementById('clear-log');
+        const logContainer = document.getElementById('log-container');
+        const responseContainer = document.getElementById('response-container');
+        const responseData = document.getElementById('response-data');
+
+        // Log function
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = message;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Simulate response
+        simulateResponseBtn.addEventListener('click', function() {
+            const responseFormat = responseFormatInput.value.trim();
+            const testMessage = testMessageInput.value.trim();
+            
+            if (!responseFormat) {
+                log('Please enter a response format', 'error');
+                return;
+            }
+            
+            log('Simulating webhook response...', 'info');
+            
+            try {
+                // Parse the response format
+                let responseObj = JSON.parse(responseFormat);
+                
+                // Replace placeholders
+                const sessionId = 'simulated_session_' + Date.now();
+                const timestamp = new Date().toISOString();
+                
+                // Convert to string for replacements
+                let responseStr = JSON.stringify(responseObj);
+                
+                // Replace placeholders
+                responseStr = responseStr.replace(/{{sessionId}}/g, sessionId);
+                responseStr = responseStr.replace(/{{message}}/g, testMessage);
+                responseStr = responseStr.replace(/{{timestamp}}/g, timestamp);
+                
+                // Parse back to object
+                responseObj = JSON.parse(responseStr);
+                
+                // Display the response
+                responseContainer.style.display = 'block';
+                responseData.textContent = JSON.stringify(responseObj, null, 2);
+                
+                // Log headers that would be sent
+                const headers = {};
+                
+                if (addContentTypeCheckbox.checked) {
+                    headers['Content-Type'] = 'application/json';
+                }
+                
+                if (enableCorsCheckbox.checked) {
+                    headers['Access-Control-Allow-Origin'] = '*';
+                    headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+                    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+                }
+                
+                log('Response headers that would be sent:', 'info');
+                log(JSON.stringify(headers, null, 2), 'info');
+                
+                // Check if response has the required properties
+                if (responseObj.response === undefined) {
+                    log('Warning: The response does not contain a "response" property, which is required by the chatbot', 'warning');
+                } else {
+                    log(`Response property: "${responseObj.response}"`, 'success');
+                }
+                
+                // Provide guidance
+                log('Simulated response generated successfully', 'success');
+                log('To fix chatbot response issues:', 'info');
+                log('1. Make sure your n8n workflow returns a JSON object with a "response" property', 'info');
+                log('2. Ensure the Webhook node in n8n has "Response Mode" set to "Last Node"', 'info');
+                log('3. Add a "Respond to Webhook" node as the last node in your workflow', 'info');
+                
+            } catch (error) {
+                log(`Error parsing response format: ${error.message}`, 'error');
+                responseContainer.style.display = 'block';
+                responseData.textContent = `Error: ${error.message}`;
+            }
+        });
+
+        // Clear log
+        clearLogBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            log('Log cleared', 'info');
+            responseContainer.style.display = 'none';
+        });
+
+        // Initialize with current timestamp
+        try {
+            const responseFormat = JSON.parse(responseFormatInput.value);
+            responseFormat.timestamp = new Date().toISOString();
+            responseFormatInput.value = JSON.stringify(responseFormat, null, 2);
+        } catch (e) {
+            // Ignore parsing errors in initial format
+        }
+    </script>
+</body>
+</html>

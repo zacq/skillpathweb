@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>n8n Webhook Response Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1a3c6e;
+        }
+        .test-section {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 150px;
+            font-family: monospace;
+        }
+        button {
+            background-color: #00b3b0;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #009a98;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .success {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>n8n Webhook Response Test</h1>
+        <p>This tool tests the n8n webhook response handling for the Skillpath.ai chatbot.</p>
+
+        <div class="test-section">
+            <div class="input-group">
+                <label for="webhook-url">Webhook URL:</label>
+                <input type="text" id="webhook-url" value="https://primary-production-3b968.up.railway.app/webhook-test/1ba9063c-4576-4874-9000-20d44594127f">
+            </div>
+
+            <div class="input-group">
+                <label for="message">Test Message:</label>
+                <input type="text" id="message" placeholder="Enter a test message" value="Hello, this is a test message">
+            </div>
+
+            <div class="input-group">
+                <label for="payload">Full Request Payload (JSON):</label>
+                <textarea id="payload">{
+  "message": "Hello, this is a test message",
+  "timestamp": "2023-07-20T12:34:56.789Z",
+  "session": {
+    "id": "test_session_123",
+    "isNew": true,
+    "type": "test"
+  },
+  "source": "n8n-webhook-test.html",
+  "userAgent": "Test Tool"
+}</textarea>
+            </div>
+
+            <div>
+                <button id="send-direct">Send Direct Request</button>
+                <button id="send-cors-proxy">Send via CORS Proxy</button>
+                <button id="clear-log">Clear Log</button>
+            </div>
+
+            <div class="response-container" id="response-container" style="display: none;">
+                <h3>Response:</h3>
+                <pre id="response-data"></pre>
+            </div>
+
+            <div class="log-container" id="log-container">
+                <div class="log-entry info">n8n webhook test tool loaded.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const webhookUrlInput = document.getElementById('webhook-url');
+        const messageInput = document.getElementById('message');
+        const payloadInput = document.getElementById('payload');
+        const sendDirectBtn = document.getElementById('send-direct');
+        const sendCorsProxyBtn = document.getElementById('send-cors-proxy');
+        const clearLogBtn = document.getElementById('clear-log');
+        const logContainer = document.getElementById('log-container');
+        const responseContainer = document.getElementById('response-container');
+        const responseData = document.getElementById('response-data');
+
+        // Log function
+        function log(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = message;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Update payload with current message
+        messageInput.addEventListener('input', function() {
+            try {
+                const payload = JSON.parse(payloadInput.value);
+                payload.message = messageInput.value;
+                payload.timestamp = new Date().toISOString();
+                payloadInput.value = JSON.stringify(payload, null, 2);
+            } catch (e) {
+                // Ignore parsing errors
+            }
+        });
+
+        // Send direct request
+        sendDirectBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(payloadInput.value);
+            } catch (e) {
+                log(`Invalid JSON payload: ${e.message}`, 'error');
+                return;
+            }
+
+            log('Sending direct request to webhook...');
+            log(`URL: ${webhookUrl}`);
+            log(`Payload: ${JSON.stringify(payload, null, 2)}`);
+
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                mode: 'cors',
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`);
+                return response.text();
+            })
+            .then(text => {
+                log('Response received');
+                
+                // Display the raw response
+                responseContainer.style.display = 'block';
+                responseData.textContent = text;
+                
+                // Try to parse as JSON
+                try {
+                    const json = JSON.parse(text);
+                    log('Response parsed as JSON successfully');
+                    
+                    // Check for response property
+                    if (json.response) {
+                        log(`Bot response: "${json.response}"`, 'success');
+                    } else {
+                        log('JSON response does not contain a "response" property', 'error');
+                    }
+                } catch (e) {
+                    log(`Response is not valid JSON: ${e.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                log(`Error: ${error.message}`, 'error');
+                responseContainer.style.display = 'block';
+                responseData.textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Send via CORS proxy
+        sendCorsProxyBtn.addEventListener('click', function() {
+            const webhookUrl = webhookUrlInput.value.trim();
+            if (!webhookUrl) {
+                log('Please enter a webhook URL', 'error');
+                return;
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(payloadInput.value);
+            } catch (e) {
+                log(`Invalid JSON payload: ${e.message}`, 'error');
+                return;
+            }
+
+            // Use CORS proxy
+            const corsProxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = encodeURIComponent(webhookUrl);
+            const proxyUrl = corsProxyUrl + targetUrl;
+
+            log('Sending request via CORS proxy...');
+            log(`Proxy URL: ${proxyUrl}`);
+            log(`Original URL: ${webhookUrl}`);
+            log(`Payload: ${JSON.stringify(payload, null, 2)}`);
+
+            fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                log(`Response status: ${response.status} ${response.statusText}`);
+                return response.text();
+            })
+            .then(text => {
+                log('Response received');
+                
+                // Display the raw response
+                responseContainer.style.display = 'block';
+                responseData.textContent = text;
+                
+                // Try to parse as JSON
+                try {
+                    const json = JSON.parse(text);
+                    log('Response parsed as JSON successfully');
+                    
+                    // Check for response property
+                    if (json.response) {
+                        log(`Bot response: "${json.response}"`, 'success');
+                    } else {
+                        log('JSON response does not contain a "response" property', 'error');
+                    }
+                } catch (e) {
+                    log(`Response is not valid JSON: ${e.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                log(`Error: ${error.message}`, 'error');
+                responseContainer.style.display = 'block';
+                responseData.textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Clear log
+        clearLogBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            log('Log cleared', 'info');
+            responseContainer.style.display = 'none';
+        });
+
+        // Initialize with current timestamp
+        try {
+            const payload = JSON.parse(payloadInput.value);
+            payload.timestamp = new Date().toISOString();
+            payloadInput.value = JSON.stringify(payload, null, 2);
+        } catch (e) {
+            // Ignore parsing errors in initial payload
+        }
+    </script>
+</body>
+</html>
